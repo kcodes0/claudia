@@ -136,7 +136,33 @@ Chose bs=32 with no gradient accumulation for maximum update frequency.
 
 **Key takeaway**: A 12.2M parameter model, trained in 30 minutes on 10GB VRAM, achieves PPL 8.3 on TinyStories with coherent multi-sentence generation, proper dialogue, and minimal repetition. The 4K custom tokenizer was the critical optimization that made this possible.
 
+### Experiment 002: Continued Training (Cycle 2)
+- **Date**: 2026-03-24
+- **Status**: COMPLETE — NEGATIVE RESULT
+- **Config**: Resumed from Exp 001 best checkpoint, LR warmup to 3e-4
+
+**Results**:
+| Metric | Cycle 1 | Cycle 2 | Delta |
+|--------|---------|---------|-------|
+| Best val loss | 2.17 | 2.24 | **+0.07 (WORSE)** |
+| Best val PPL | 8.74 | 9.37 | +0.63 |
+| Final val loss | 2.14 | 2.40 | +0.26 |
+
+**What went wrong**: LR 3e-4 was too aggressive for continued training. The model was already well-optimized at loss ~2.1 and a high learning rate pushed it away from the optimum. The loss trajectory shows:
+- Steps 0-1500: Brief improvement to 2.24 (LR still warming up, effectively low)
+- Steps 1500+: Loss increases as LR reaches full 3e-4, model overshoots
+- Final: 2.40 — significantly worse than the starting checkpoint
+
+**Lesson learned**: When resuming training from a good checkpoint, use a much lower max LR. For this model, 5e-5 to 1e-4 is appropriate for continued training (10-20x lower than initial training LR).
+
+**Code bug found**: The training script resets `best_val_loss = inf` on each run, so cycle 2 overwrote the superior cycle 1 checkpoint. Fixed in next commit.
+
+### Experiment 003: Cycle 3 (planned)
+- **Config**: Resume from Exp 001 best, LR max 5e-5, cosine decay
+- **Goal**: Actually improve on PPL 8.3 by training on new data without destroying learned representations
+- **Status**: PENDING
+
 **Next steps**:
-- Consider training longer or on more data subsets
-- Try the "small" (27M) config if memory allows
-- Instruction tuning as a stretch goal
+- Fix resume to preserve best_val_loss across runs
+- Retrain cycle 3 with corrected LR (5e-5)
+- Add grammar engine evaluation to metrics

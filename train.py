@@ -86,12 +86,14 @@ def train(args):
     config.vocab_size = tokenizer.vocab_size
     model = Claudia(config).to(device)
     resumed_step = 0
+    resumed_best_loss = float("inf")
     if args.resume and os.path.exists(args.resume):
         ckpt = torch.load(args.resume, map_location=device, weights_only=False)
         model.load_state_dict(ckpt["model_state_dict"])
         resumed_step = ckpt.get("step", 0)
-        prev_loss = ckpt.get("val_loss", "?")
-        print(f"Resumed from {args.resume} (step {resumed_step}, val_loss={prev_loss})")
+        resumed_best_loss = ckpt.get("val_loss", float("inf"))
+        print(f"Resumed from {args.resume} (step {resumed_step}, val_loss={resumed_best_loss:.4f})")
+        print(f"  Will only save checkpoints that beat val_loss={resumed_best_loss:.4f}")
     params = model.param_count()
     param_mb = params * 4 / 1e6
     print(f"\nClaudia [{args.config}]: {params:,} params ({params/1e6:.1f}M) | ~{param_mb:.0f}MB fp32")
@@ -125,7 +127,7 @@ def train(args):
     log = {"config": args.config, "params": params, "steps": []}
 
     global_step = 0
-    best_val_loss = float("inf")
+    best_val_loss = resumed_best_loss
     tokens_processed = 0
     t0 = time.time()
     calibrated = False
