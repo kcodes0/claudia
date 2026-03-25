@@ -22,7 +22,6 @@ from claudia.model import Claudia
 from claudia.tokenizer import ClaudiaTokenizer
 from claudia.data import prepare_tinystories, create_dataloaders
 
-# Hard 10GB VRAM cap for MPS
 # Hard ~10GB VRAM cap (0.85 of ~11.8GB recommended pool)
 os.environ["PYTORCH_MPS_HIGH_WATERMARK_RATIO"] = "0.85"
 os.environ["PYTORCH_MPS_LOW_WATERMARK_RATIO"] = "0.7"
@@ -82,12 +81,19 @@ def train(args):
     tokenizer = ClaudiaTokenizer()
     print(f"Tokenizer vocab: {tokenizer.vocab_size}")
 
-    # Model
+    # Model — optionally resume from checkpoint
     config = CONFIGS[args.config]
-    config.vocab_size = tokenizer.vocab_size  # Match tokenizer
+    config.vocab_size = tokenizer.vocab_size
     model = Claudia(config).to(device)
+    resumed_step = 0
+    if args.resume and os.path.exists(args.resume):
+        ckpt = torch.load(args.resume, map_location=device, weights_only=False)
+        model.load_state_dict(ckpt["model_state_dict"])
+        resumed_step = ckpt.get("step", 0)
+        prev_loss = ckpt.get("val_loss", "?")
+        print(f"Resumed from {args.resume} (step {resumed_step}, val_loss={prev_loss})")
     params = model.param_count()
-    param_mb = params * 4 / 1e6  # fp32 size
+    param_mb = params * 4 / 1e6
     print(f"\nClaudia [{args.config}]: {params:,} params ({params/1e6:.1f}M) | ~{param_mb:.0f}MB fp32")
 
     # Data
@@ -256,5 +262,6 @@ if __name__ == "__main__":
     parser.add_argument("--sample-interval", type=int, default=1000)
     parser.add_argument("--output-dir", default="checkpoints")
     parser.add_argument("--num-workers", type=int, default=0)
+    parser.add_argument("--resume", type=str, default=None, help="Resume from checkpoint path")
     args = parser.parse_args()
     train(args)
