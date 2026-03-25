@@ -125,8 +125,18 @@ Chose bs=32 with no gradient accumulation for maximum update frequency.
 4. Only saw 8% of the training data — huge room for improvement with more time
 5. Custom 4K tokenizer + fp16 made this possible within 10GB
 
+**Evaluation results** (full validation set):
+| Metric | Value | Notes |
+|--------|-------|-------|
+| Perplexity | 8.30 | On full validation set |
+| Distinct-1 | 0.159 | Unigram diversity |
+| Distinct-2 | 0.514 | Bigram diversity (decent) |
+| Distinct-3 | 0.758 | Trigram diversity (good) |
+| Repetition (4-gram) | 0.010 | Very low repetition |
+
+**Key takeaway**: A 12.2M parameter model, trained in 30 minutes on 10GB VRAM, achieves PPL 8.3 on TinyStories with coherent multi-sentence generation, proper dialogue, and minimal repetition. The 4K custom tokenizer was the critical optimization that made this possible.
+
 **Next steps**:
-- Run evaluation suite (perplexity, distinct-n, repetition metrics)
 - Consider training longer or on more data subsets
 - Try the "small" (27M) config if memory allows
 - Instruction tuning as a stretch goal
