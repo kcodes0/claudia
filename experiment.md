@@ -157,12 +157,41 @@ Chose bs=32 with no gradient accumulation for maximum update frequency.
 
 **Code bug found**: The training script resets `best_val_loss = inf` on each run, so cycle 2 overwrote the superior cycle 1 checkpoint. Fixed in next commit.
 
-### Experiment 003: Cycle 3 (planned)
-- **Config**: Resume from Exp 001 best, LR max 5e-5, cosine decay
-- **Goal**: Actually improve on PPL 8.3 by training on new data without destroying learned representations
-- **Status**: PENDING
+### Experiment 003: Cycle 3 — Conservative LR
+- **Date**: 2026-03-25
+- **Status**: COMPLETE — NEUTRAL
+- **Config**: Resume from Exp 002 best (val_loss=2.24), LR max 5e-5
 
-**Next steps**:
-- Fix resume to preserve best_val_loss across runs
-- Retrain cycle 3 with corrected LR (5e-5)
-- Add grammar engine evaluation to metrics
+**Results**: Checkpoint protection worked correctly. Best val_loss stayed at 2.24 (cycle 2 best). The model didn't improve — LR was too conservative to overcome the local minimum, and throughput dropped to ~19K tok/s due to system load.
+
+**Progression across cycles**:
+| Metric | Cycle 1 | Cycle 2 | Cycle 3 |
+|--------|---------|---------|---------|
+| Best val loss | 2.17 (LOST) | 2.24 | 2.24 (unchanged) |
+| Total tokens | 38.5M | 38.6M | 35.0M |
+| LR max | 6e-4 | 3e-4 | 5e-5 |
+
+## Overall Assessment (v0.2)
+
+Claudia v0.2 is a **12.2M parameter decoder-only transformer** with:
+- Custom 4096-token BPE tokenizer
+- LLaMA-style architecture (RMSNorm, RoPE, SwiGLU)
+- Grammar heuristics post-processing engine
+- Trained on TinyStories in 30 minutes under 10GB VRAM
+
+**Best metrics**: PPL ~8.9 on TinyStories validation (current best checkpoint)
+**Generation quality**: Coherent multi-sentence stories with dialogue, characters, and narrative structure
+**Grammar engine**: Fixes capitalization, punctuation, quotes, repetition, and incomplete sentences
+
+**What I learned**:
+1. Custom tokenizer was the #1 optimization (92% embedding reduction)
+2. LR must be carefully tuned for continued training (too high destroys, too low stalls)
+3. The original cycle 1 model (PPL 8.3) was the best — it was lost due to a checkpoint bug, now fixed
+4. 12M params at 256 context is near its capacity ceiling for this dataset
+5. Next improvement requires architectural changes: larger context, more params, or better data
+
+**Future evolution paths**:
+- Train from scratch with optimal single-run LR schedule (no resume)
+- Increase context to 512 tokens (may need smaller batch)
+- Scale to "small" config (27M params) with gradient checkpointing
+- Add grammar engine metrics to the eval pipeline
